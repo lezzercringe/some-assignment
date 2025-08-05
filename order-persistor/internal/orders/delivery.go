@@ -1,4 +1,4 @@
-package deliveries
+package orders
 
 type Delivery struct {
 	Name    string `json:"name"`
