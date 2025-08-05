@@ -1,0 +1,23 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./queries"
+    schema: "../migrations-runner/migrations"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/postgres/sqlc"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "text"
+            go_type: "string"
+          - db_type: "decimal"
+            go_type: "github.com/shopspring/decimal.Decimal"
+          - db_type: "pg_catalog.numeric"
+            go_type: "github.com/shopspring/decimal.Decimal"
+          - db_type: "money"
+            go_type: "github.com/shopspring/decimal.Decimal"
+          - db_type: "timestamp"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
