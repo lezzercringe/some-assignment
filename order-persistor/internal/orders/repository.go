@@ -1,6 +1,11 @@
 package orders
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var ErrInternalFailure = errors.New("internal db failure")
 
 type Repository interface {
 	GetByID(ctx context.Context, id string) (*Order, error)

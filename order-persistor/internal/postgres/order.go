@@ -35,13 +35,16 @@ func (r *OrdersRepository) Create(ctx context.Context, order *orders.Order) (*or
 
 		if order.Payment != nil {
 			inserted.Payment, err = r.PaymentsRepository.Create(ctx, order.Payment)
+			if err != nil {
+				return err
+			}
 		}
 
 		return err
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, describeError(err)
 	}
 
 	return inserted, nil
@@ -75,7 +78,7 @@ func (r *OrdersRepository) GetByID(ctx context.Context, id string) (*orders.Orde
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, describeError(err)
 	}
 
 	return &order, nil
