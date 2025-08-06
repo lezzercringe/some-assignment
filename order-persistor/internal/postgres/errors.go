@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"order-persistor/internal/orders"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func describeError(err error) error {
 	if err == nil {
 		return nil
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return orders.ErrNotFound
 	}
 
 	var pgErr *pgconn.PgError
@@ -25,5 +30,5 @@ func describeError(err error) error {
 		}
 	}
 
-	return errors.Join(orders.ErrInternalFailure)
+	return errors.Join(orders.ErrInternalFailure, err)
 }

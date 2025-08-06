@@ -10,6 +10,7 @@ import (
 	"order-persistor/internal/orders"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/go-playground/validator/v10"
 )
 
 type OrdersConsumer struct {
@@ -18,6 +19,8 @@ type OrdersConsumer struct {
 
 	ordersRepository orders.Repository
 	logger           *slog.Logger
+
+	stopCh chan struct{}
 }
 
 func NewOrdersConsumer(cfg config.KafkaConsumer, ordersRepository orders.Repository, logger *slog.Logger) (*OrdersConsumer, error) {
@@ -40,17 +43,25 @@ func NewOrdersConsumer(cfg config.KafkaConsumer, ordersRepository orders.Reposit
 	}, nil
 }
 
-func (c *OrdersConsumer) Run(ctx context.Context) error {
-	c.logger.InfoContext(ctx, "started kafka consumer")
+func (c *OrdersConsumer) Stop() {
+	c.stopCh <- struct{}{}
+}
+
+func (c *OrdersConsumer) Run() error {
+	c.stopCh = make(chan struct{})
+	c.logger.Info("started kafka consumer", "cfg", c.cfg)
 
 	if err := c.consumer.Subscribe(c.cfg.Topic, nil); err != nil {
 		return fmt.Errorf("could not subscribe to a topic: %w", err)
 	}
+	defer c.consumer.Close()
+
+	c.logger.Info("subscribed succesfully")
 
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-c.stopCh:
+			return nil
 		default:
 			msg, err := c.consumer.ReadMessage(c.cfg.ReadTimeout)
 			if err != nil {
@@ -58,14 +69,18 @@ func (c *OrdersConsumer) Run(ctx context.Context) error {
 					continue
 				}
 
-				return err
+				return fmt.Errorf("reading message: %w", err)
 			}
+
+			c.logger.Debug("consumed order from kafka")
+
+			ctx, cancel := context.WithTimeout(context.Background(), c.cfg.ProcessTimeout)
+			defer cancel()
 
 			if err := c.handleMessage(ctx, msg.Value); err != nil {
 				c.logger.ErrorContext(ctx,
 					"failure processing order from kafka",
 					"err", err,
-					"message", string(msg.Value),
 				)
 
 				continue
@@ -82,6 +97,16 @@ func (c *OrdersConsumer) Run(ctx context.Context) error {
 func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 	var order orders.Order
 	if err := json.Unmarshal(body, &order); err != nil {
+		c.logger.ErrorContext(ctx,
+			"bad json order from kafka",
+			"err", err,
+			"message", string(body),
+		)
+
+		return nil
+	}
+
+	if err := validator.New().StructCtx(ctx, order); err != nil {
 		c.logger.ErrorContext(ctx,
 			"consumed malformed order from kafka",
 			"err", err,

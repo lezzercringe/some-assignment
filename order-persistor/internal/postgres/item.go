@@ -8,11 +8,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type ItemDAO struct {
+type ItemsDAO struct {
 	Pool *pgxpool.Pool
 }
 
-func (r *ItemDAO) Create(ctx context.Context, orderID string, i *orders.Item) (*orders.Item, error) {
+func (r *ItemsDAO) Create(ctx context.Context, orderID string, i *orders.Item) (*orders.Item, error) {
 	exec := extractExecutor(ctx, r.Pool)
 	item, err := sqlc.New(exec).CreateItem(ctx, sqlc.CreateItemParams{
 		OrderID:     orderID,
@@ -36,7 +36,7 @@ func (r *ItemDAO) Create(ctx context.Context, orderID string, i *orders.Item) (*
 	return mapDtoToItem(item), nil
 }
 
-func (r *ItemDAO) GetByOrderID(ctx context.Context, orderID string) ([]orders.Item, error) {
+func (r *ItemsDAO) GetByOrderID(ctx context.Context, orderID string) ([]orders.Item, error) {
 	exec := extractExecutor(ctx, r.Pool)
 	dtos, err := sqlc.New(exec).GetItemsByOrderID(ctx, orderID)
 

@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"order-persistor/internal/orders"
-	"order-persistor/internal/orders/payments"
 	"order-persistor/internal/postgres/sqlc"
 
 	"github.com/jackc/pgx/v5"
@@ -13,9 +12,9 @@ import (
 var _ orders.Repository = &OrdersRepository{}
 
 type OrdersRepository struct {
-	PaymentsRepository payments.Repository
-	ItemDAO            *ItemDAO
-	Pool               *pgxpool.Pool
+	ItemsDAO    *ItemsDAO
+	PaymentsDAO *PaymentsDAO
+	Pool        *pgxpool.Pool
 }
 
 func (r *OrdersRepository) Create(ctx context.Context, order *orders.Order) (*orders.Order, error) {
@@ -34,7 +33,7 @@ func (r *OrdersRepository) Create(ctx context.Context, order *orders.Order) (*or
 		}
 
 		if order.Payment != nil {
-			inserted.Payment, err = r.PaymentsRepository.Create(ctx, order.Payment)
+			inserted.Payment, err = r.PaymentsDAO.Create(ctx, order.ID, order.Payment)
 			if err != nil {
 				return err
 			}
@@ -63,12 +62,12 @@ func (r *OrdersRepository) GetByID(ctx context.Context, id string) (*orders.Orde
 
 		order = *mapDtoToOrder(dto)
 
-		order.Items, err = r.ItemDAO.GetByOrderID(ctx, id)
+		order.Items, err = r.ItemsDAO.GetByOrderID(ctx, id)
 		if err != nil {
 			return err
 		}
 
-		payment, err := r.PaymentsRepository.GetByOrderID(ctx, id)
+		payment, err := r.PaymentsDAO.GetByOrderID(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -116,7 +115,7 @@ func (r *OrdersRepository) insertOrder(ctx context.Context, o *orders.Order) (*o
 func (r *OrdersRepository) insertItems(ctx context.Context, orderID string, items []orders.Item) ([]orders.Item, error) {
 	inserted := make([]orders.Item, 0, len(items))
 	for _, item := range items {
-		item, err := r.ItemDAO.Create(ctx, orderID, &item)
+		item, err := r.ItemsDAO.Create(ctx, orderID, &item)
 		if err != nil {
 			return nil, err
 		}

@@ -2,19 +2,17 @@ package postgres
 
 import (
 	"context"
-	"order-persistor/internal/orders/payments"
+	"order-persistor/internal/orders"
 	"order-persistor/internal/postgres/sqlc"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var _ payments.Repository = &PaymentsRepository{}
-
-type PaymentsRepository struct {
+type PaymentsDAO struct {
 	Pool *pgxpool.Pool
 }
 
-func (r *PaymentsRepository) GetByOrderID(ctx context.Context, orderID string) (*payments.Payment, error) {
+func (r *PaymentsDAO) GetByOrderID(ctx context.Context, orderID string) (*orders.Payment, error) {
 	exec := extractExecutor(ctx, r.Pool)
 	dto, err := sqlc.New(exec).GetPaymentByOrderID(ctx, orderID)
 	if err != nil {
@@ -24,11 +22,11 @@ func (r *PaymentsRepository) GetByOrderID(ctx context.Context, orderID string) (
 	return mapDtoToPayment(dto), nil
 }
 
-func (r *PaymentsRepository) Create(ctx context.Context, p *payments.Payment) (*payments.Payment, error) {
+func (r *PaymentsDAO) Create(ctx context.Context, orderID string, p *orders.Payment) (*orders.Payment, error) {
 	exec := extractExecutor(ctx, r.Pool)
 	dto, err := sqlc.New(exec).CreatePayment(ctx, sqlc.CreatePaymentParams{
 		Transaction:  p.Transaction,
-		OrderID:      p.OrderID,
+		OrderID:      orderID,
 		RequestID:    p.RequestID,
 		Currency:     p.Currency,
 		Provider:     p.Provider,
@@ -47,10 +45,9 @@ func (r *PaymentsRepository) Create(ctx context.Context, p *payments.Payment) (*
 	return mapDtoToPayment(dto), nil
 }
 
-func mapDtoToPayment(p sqlc.Payment) *payments.Payment {
-	return &payments.Payment{
+func mapDtoToPayment(p sqlc.Payment) *orders.Payment {
+	return &orders.Payment{
 		Transaction:  p.Transaction,
-		OrderID:      p.OrderID,
 		RequestID:    p.RequestID,
 		Currency:     p.Currency,
 		Provider:     p.Provider,

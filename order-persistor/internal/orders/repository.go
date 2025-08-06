@@ -5,7 +5,10 @@ import (
 	"errors"
 )
 
-var ErrInternalFailure = errors.New("internal db failure")
+var (
+	ErrInternalFailure = errors.New("internal db failure")
+	ErrNotFound        = errors.New("not found")
+)
 
 type Repository interface {
 	GetByID(ctx context.Context, id string) (*Order, error)

@@ -1,23 +1,20 @@
 package orders
 
-import (
-	"order-persistor/internal/orders/payments"
-	"time"
-)
+import "time"
 
 type Order struct {
-	ID              string            `json:"order_uid"`
-	TrackNumber     string            `json:"track_number"`
-	Entry           string            `json:"entry"`
-	Delivery        Delivery          `json:"delivery"`
-	Payment         *payments.Payment `json:"payment"`
-	Items           []Item            `json:"items"`
-	Locale          string            `json:"locale"`
-	Signature       string            `json:"internal_signature"`
-	CustomerID      string            `json:"customer_id"`
-	DeliveryService string            `json:"delivery_service"`
-	ShardKey        string            `json:"shardkey"`
-	SMID            int               `json:"sm_id"`
-	CreatedAt       time.Time         `json:"date_created"`
-	OOFShard        string            `json:"oof_shard"`
+	ID              string    `json:"order_uid" validate:"required"`
+	TrackNumber     string    `json:"track_number" validate:"required"`
+	Entry           string    `json:"entry" validate:"required"`
+	Delivery        Delivery  `json:"delivery"`
+	Payment         *Payment  `json:"payment"`
+	Items           []Item    `json:"items"`
+	Locale          string    `json:"locale" validate:"required"`
+	Signature       string    `json:"internal_signature"`
+	CustomerID      string    `json:"customer_id" validate:"required"`
+	DeliveryService string    `json:"delivery_service" validate:"required"`
+	ShardKey        string    `json:"shardkey" validate:"required"`
+	SMID            int       `json:"sm_id" validate:"required"`
+	CreatedAt       time.Time `json:"date_created" validate:"required"`
+	OOFShard        string    `json:"oof_shard" validate:"required,numeric"`
 }

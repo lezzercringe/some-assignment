@@ -1,0 +1,16 @@
+cache:
+  size: 100
+log:
+  level: debug
+postgres:
+  conn_string: postgres://postgres:development@localhost:5432/postgres
+kafka_consumer:
+  servers: localhost
+  group_id: 1
+  topic: orders
+  read_timeout: 1000ms
+  process_timeout: 300ms
+api:
+  host: localhost
+  port: 8081
+  timeout: 1s
