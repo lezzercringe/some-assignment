@@ -3,7 +3,7 @@ package config
 import (
 	"io"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func Load(r io.Reader, out *Config) error {

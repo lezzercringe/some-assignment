@@ -4,6 +4,9 @@ import (
 	"context"
 	"flag"
 	"log/slog"
+	"net"
+	"net/http"
+	"order-persistor/internal/api"
 	"order-persistor/internal/config"
 	"order-persistor/internal/inmemory"
 	"order-persistor/internal/kafka"
@@ -12,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,7 +38,7 @@ func main() {
 
 	var cfg config.Config
 	if err := config.Load(cfgFile, &cfg); err != nil {
-		slog.Error("fail loading config", "err", err)
+		slog.Error("failure loading config", "err", err)
 		os.Exit(1)
 	}
 
@@ -44,37 +48,80 @@ func main() {
 		os.Exit(1)
 	}
 
-	pool, _ := pgxpool.New(context.Background(), cfg.Postgres.ConnString)
+	pool, err := pgxpool.New(context.Background(), cfg.Postgres.ConnString)
+	if err != nil {
+		logger.Error("creating pg pool", "err", err)
+		return
+	}
 
-	paymentsRepository := postgres.PaymentsRepository{
+	paymentsDAO := postgres.PaymentsDAO{
 		Pool: pool,
 	}
 
-	itemDAO := postgres.ItemDAO{
+	itemsDAO := postgres.ItemsDAO{
 		Pool: pool,
 	}
 
 	ordersRepository := postgres.OrdersRepository{
-		ItemDAO:            &itemDAO,
-		PaymentsRepository: &paymentsRepository,
-		Pool:               pool,
+		ItemsDAO:    &itemsDAO,
+		PaymentsDAO: &paymentsDAO,
+		Pool:        pool,
 	}
 
-	cachingOrdersRepository, _ := inmemory.NewOrdersCache(
-		cfg.Cache, &ordersRepository, logger,
-	)
-
-	ordersConsumer, err := kafka.NewOrdersConsumer(cfg.KafkaConsumer, cachingOrdersRepository, logger)
+	cachingOrdersRepository, err := inmemory.NewOrdersCache(cfg.Cache, &ordersRepository, logger)
 	if err != nil {
-		logger.Error("fail createing order consumer", "err", err)
+		logger.Error("creating orders cache", "err", err)
 		return
 	}
 
+	ordersConsumer, err := kafka.NewOrdersConsumer(cfg.KafkaConsumer, cachingOrdersRepository, logger)
+	if err != nil {
+		logger.Error("failure creating order consumer", "err", err)
+		return
+	}
+
+	mux := http.NewServeMux()
+	handler := api.GetOrderHandler{
+		Logger:     logger,
+		Repository: cachingOrdersRepository,
+	}
+
+	httpAddr := net.JoinHostPort(cfg.API.Host, cfg.API.Port)
+	mux.Handle("/order/{id}", &handler)
+	srv := http.Server{
+		Addr:    httpAddr,
+		Handler: mux,
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	setupSignalHandler(func() {
+		logger.Info("received shutdown signal")
 		cancel()
 	})
-	ordersConsumer.Run(ctx)
+
+	go func() {
+		logger.Info("started api server", "addr", httpAddr)
+		err := srv.ListenAndServe()
+		logger.Info("api server stopped", "err", err)
+		cancel()
+	}()
+
+	go func() {
+		err := ordersConsumer.Run()
+		logger.Info("kafka consumer stopped", "err", err)
+		cancel()
+	}()
+
+	<-ctx.Done()
+	logger.Info("shutting down...")
+
+	ordersConsumer.Stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv.Shutdown(shutdownCtx)
 }
 
 func setupSignalHandler(signalHandler func()) {
