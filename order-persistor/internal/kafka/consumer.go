@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"order-persistor/internal/config"
 	"order-persistor/internal/orders"
+	"sync"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-playground/validator/v10"
@@ -20,7 +22,7 @@ type OrdersConsumer struct {
 	ordersRepository orders.Repository
 	logger           *slog.Logger
 
-	stopCh chan struct{}
+	shutdownOnce sync.Once
 }
 
 // NewOrdersConsumer creates a ready-to-use kafka orders consumer, however at the point of creation no subscription is being done.
@@ -45,26 +47,28 @@ func NewOrdersConsumer(cfg config.KafkaConsumer, ordersRepository orders.Reposit
 	}, nil
 }
 
-func (c *OrdersConsumer) Stop() {
-	c.stopCh <- struct{}{}
-}
-
 // Run subcribes to the topic and starts processing it, blocking the calling coroutine.
 func (c *OrdersConsumer) Run(ctx context.Context) error {
-	c.stopCh = make(chan struct{}, 1)
 	c.logger.Info("started kafka consumer", "cfg", c.cfg)
 
 	if err := c.consumer.Subscribe(c.cfg.Topic, nil); err != nil {
 		return fmt.Errorf("could not subscribe to a topic: %w", err)
 	}
-	defer c.consumer.Close()
+	defer c.closeConsumer()
+
+	// this is needed to unblock main goroutine from being stuck in ReadMessage() call
+	// in case of context cancellation
+	go func() {
+		<-ctx.Done()
+		c.closeConsumer()
+	}()
 
 	c.logger.Info("subscribed succesfully")
 
 	for {
 		select {
-		case <-c.stopCh:
-			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		default:
 			msg, err := c.consumer.ReadMessage(c.cfg.ReadTimeout)
 			if err != nil {
@@ -72,30 +76,49 @@ func (c *OrdersConsumer) Run(ctx context.Context) error {
 					continue
 				}
 
-				return fmt.Errorf("reading message: %w", err)
+				c.logger.Error(
+					"error reading messages from kafka",
+					"err", err, "will start retrying each", c.cfg.ReadFailureBackoff.String(),
+				)
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(c.cfg.ReadFailureBackoff):
+					continue
+				}
 			}
 
 			c.logger.Debug("consumed order from kafka")
 
-			ctx, cancel := context.WithTimeout(ctx, c.cfg.ProcessTimeout)
-			defer cancel()
+			// process message inside a closure to be able to use defer cancel()
+			err = func() error {
+				ctx, cancel := context.WithTimeout(ctx, c.cfg.ProcessTimeout)
+				defer cancel()
+				return c.handleMessage(ctx, msg.Value)
+			}()
 
-			if err := c.handleMessage(ctx, msg.Value); err != nil {
+			// do not commit in case of internal error (if order was valid)
+			if err != nil && !errors.Is(err, errMalformedOrder) {
 				c.logger.ErrorContext(ctx,
 					"failure processing order from kafka",
 					"err", err,
 				)
 
-				continue
+				return err
 			}
 
 			_, err = c.consumer.Commit()
 			if err != nil {
 				return fmt.Errorf("could not commit message: %w", err)
 			}
+
+			continue
 		}
 	}
 }
+
+var errMalformedOrder = errors.New("message was malformed")
 
 func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 	var order orders.Order
@@ -106,17 +129,21 @@ func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 			"message", string(body),
 		)
 
-		return nil
+		return errMalformedOrder
 	}
 
 	if err := validator.New().StructCtx(ctx, order); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		c.logger.ErrorContext(ctx,
 			"consumed malformed order from kafka",
 			"err", err,
 			"message", string(body),
 		)
 
-		return nil
+		return errMalformedOrder
 	}
 
 	if _, err := c.ordersRepository.Create(ctx, &order); err != nil {
@@ -129,7 +156,20 @@ func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 			"err", err,
 			"message", string(body),
 		)
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		return errMalformedOrder
 	}
 
 	return nil
+}
+
+// closeConsumer wraps closing inner consumer into sync.Once
+func (c *OrdersConsumer) closeConsumer() {
+	c.shutdownOnce.Do(func() {
+		c.consumer.Close()
+	})
 }
