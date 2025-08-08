@@ -15,10 +15,9 @@ var _ orders.Repository = &OrdersCache{}
 
 type OrdersCache struct {
 	decoratee orders.Repository
+	size      int
 	lru       *lru.Cache[string, *orders.Order]
 	logger    *slog.Logger
-
-	cfg config.Cache
 }
 
 // NewOrdersCache creates a ready-to-use LRU cache.
@@ -35,14 +34,14 @@ func NewOrdersCache(cfg config.Cache, decoratee orders.Repository, logger *slog.
 		decoratee: decoratee,
 		lru:       lru,
 		logger:    logger,
-		cfg:       cfg,
+		size:      cfg.Size,
 	}, nil
 }
 
 // Prefill fills up the cache with the most fresh orders.
 func (c *OrdersCache) Prefill(ctx context.Context) error {
 	now := time.Now()
-	qtyLoaded, err := c.load(ctx, c.cfg.Size)
+	qtyLoaded, err := c.load(ctx, c.size)
 	took := time.Since(now)
 	if err != nil {
 		return err

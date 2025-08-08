@@ -7,19 +7,21 @@ type Log struct {
 }
 
 type Cache struct {
-	Prefill struct {
-		Enabled bool          `yaml:"enabled"`
-		Timeout time.Duration `yaml:"timeout"`
-	} `yaml:"prefill" validate:"required"`
 	Size int `yaml:"size" validate:"required,gte=0"`
 }
 
+type Prefill struct {
+	Enabled bool          `yaml:"enabled"`
+	Timeout time.Duration `yaml:"timeout"`
+}
+
 type KafkaConsumer struct {
-	Servers        string        `yaml:"servers" validate:"required"`
-	GroupID        string        `yaml:"group_id"`
-	Topic          string        `yaml:"topic" validate:"required"`
-	ReadTimeout    time.Duration `yaml:"read_timeout" validate:"required"`
-	ProcessTimeout time.Duration `yaml:"process_timeout" validate:"required"`
+	Servers            string        `yaml:"servers" validate:"required"`
+	GroupID            string        `yaml:"group_id"`
+	Topic              string        `yaml:"topic" validate:"required"`
+	ReadTimeout        time.Duration `yaml:"read_timeout" validate:"required"`
+	ProcessTimeout     time.Duration `yaml:"process_timeout" validate:"required"`
+	ReadFailureBackoff time.Duration `yaml:"read_failure_backoff" validate:"required"`
 }
 
 type API struct {
@@ -38,4 +40,5 @@ type Config struct {
 	KafkaConsumer KafkaConsumer `yaml:"kafka_consumer" validate:"required"`
 	Postgres      Postgres      `yaml:"postgres" validate:"required"`
 	API           API           `yaml:"api" validate:"required"`
+	Prefill       Prefill       `yaml:"prefill" validate:"required"`
 }

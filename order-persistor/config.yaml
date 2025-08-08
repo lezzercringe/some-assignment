@@ -2,7 +2,7 @@ cache:
   prefill:
     enabled: true
     timeout: 3s
-  size: 100
+  size: 1000
 log:
   level: debug
 postgres:
@@ -11,7 +11,8 @@ kafka_consumer:
   servers: localhost
   group_id: 1
   topic: orders
-  read_timeout: 1000ms
+  read_timeout: 1s
+  read_failure_backoff: 3s
   process_timeout: 300ms
 api:
   host: localhost
