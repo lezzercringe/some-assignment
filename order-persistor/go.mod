@@ -5,10 +5,12 @@ go 1.24.5
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.11.0
 	github.com/go-playground/validator/v10 v10.27.0
+	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/shopspring/decimal v1.4.0
+	go.uber.org/mock v0.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
