@@ -50,7 +50,7 @@ func (c *OrdersConsumer) Stop() {
 }
 
 // Run subcribes to the topic and starts processing it, blocking the calling coroutine.
-func (c *OrdersConsumer) Run() error {
+func (c *OrdersConsumer) Run(ctx context.Context) error {
 	c.stopCh = make(chan struct{}, 1)
 	c.logger.Info("started kafka consumer", "cfg", c.cfg)
 
@@ -77,7 +77,7 @@ func (c *OrdersConsumer) Run() error {
 
 			c.logger.Debug("consumed order from kafka")
 
-			ctx, cancel := context.WithTimeout(context.Background(), c.cfg.ProcessTimeout)
+			ctx, cancel := context.WithTimeout(ctx, c.cfg.ProcessTimeout)
 			defer cancel()
 
 			if err := c.handleMessage(ctx, msg.Value); err != nil {

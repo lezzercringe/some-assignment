@@ -109,7 +109,7 @@ func main() {
 	}()
 
 	go func() {
-		err := ordersConsumer.Run()
+		err := ordersConsumer.Run(ctx)
 		logger.Info("kafka consumer stopped", "err", err)
 		cancel()
 	}()
