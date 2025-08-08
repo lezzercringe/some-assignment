@@ -4,8 +4,6 @@ import (
 	"context"
 	"flag"
 	"log/slog"
-	"net"
-	"net/http"
 	"order-persistor/internal/api"
 	"order-persistor/internal/config"
 	"order-persistor/internal/inmemory"
@@ -37,7 +35,7 @@ func main() {
 	defer cfgFile.Close()
 
 	var cfg config.Config
-	if err := config.Load(cfgFile, &cfg); err != nil {
+	if err := config.LoadAndValidate(cfgFile, &cfg); err != nil {
 		slog.Error("failure loading config", "err", err)
 		os.Exit(1)
 	}
@@ -53,6 +51,7 @@ func main() {
 		logger.Error("creating pg pool", "err", err)
 		return
 	}
+	defer pool.Close()
 
 	paymentsDAO := postgres.PaymentsDAO{
 		Pool: pool,
@@ -80,18 +79,10 @@ func main() {
 		return
 	}
 
-	mux := http.NewServeMux()
-	handler := api.GetOrderHandler{
-		Logger:     logger,
-		Repository: cachingOrdersRepository,
-	}
-
-	httpAddr := net.JoinHostPort(cfg.API.Host, cfg.API.Port)
-	mux.Handle("/order/{id}", &handler)
-	srv := http.Server{
-		Addr:    httpAddr,
-		Handler: mux,
-	}
+	srv := api.NewServer(cfg.API, api.Params{
+		Logger:           logger,
+		OrdersRepository: cachingOrdersRepository,
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -101,8 +92,17 @@ func main() {
 		cancel()
 	})
 
+	if cfg.Cache.Prefill.Enabled {
+		ctx, cancel := context.WithTimeout(ctx, cfg.Cache.Prefill.Timeout)
+		defer cancel()
+
+		if err := cachingOrdersRepository.Prefill(ctx); err != nil {
+			logger.Error("error initializing order cache", "err", err)
+			os.Exit(1)
+		}
+	}
+
 	go func() {
-		logger.Info("started api server", "addr", httpAddr)
 		err := srv.ListenAndServe()
 		logger.Info("api server stopped", "err", err)
 		cancel()

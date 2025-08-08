@@ -23,6 +23,8 @@ type OrdersConsumer struct {
 	stopCh chan struct{}
 }
 
+// NewOrdersConsumer creates a ready-to-use kafka orders consumer, however at the point of creation no subscription is being done.
+// Subscription only starts with an explicit call of Run function.
 func NewOrdersConsumer(cfg config.KafkaConsumer, ordersRepository orders.Repository, logger *slog.Logger) (*OrdersConsumer, error) {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":  cfg.Servers,
@@ -47,8 +49,9 @@ func (c *OrdersConsumer) Stop() {
 	c.stopCh <- struct{}{}
 }
 
+// Run subcribes to the topic and starts processing it, blocking the calling coroutine.
 func (c *OrdersConsumer) Run() error {
-	c.stopCh = make(chan struct{})
+	c.stopCh = make(chan struct{}, 1)
 	c.logger.Info("started kafka consumer", "cfg", c.cfg)
 
 	if err := c.consumer.Subscribe(c.cfg.Topic, nil); err != nil {

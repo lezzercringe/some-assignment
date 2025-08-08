@@ -7,6 +7,10 @@ type Log struct {
 }
 
 type Cache struct {
+	Prefill struct {
+		Enabled bool          `yaml:"enabled"`
+		Timeout time.Duration `yaml:"timeout"`
+	} `yaml:"prefill" validate:"required"`
 	Size int `yaml:"size" validate:"required,gte=0"`
 }
 

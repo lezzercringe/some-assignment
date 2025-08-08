@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"order-persistor/internal/config"
 	"order-persistor/internal/orders"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 )
@@ -16,8 +17,14 @@ type OrdersCache struct {
 	decoratee orders.Repository
 	lru       *lru.Cache[string, *orders.Order]
 	logger    *slog.Logger
+
+	cfg config.Cache
 }
 
+// NewOrdersCache creates a ready-to-use LRU cache.
+// It does not bootstrap or pre-fill the cache, even if pre-filling is enabled in the configuration,
+// because it is a potentially long-running operation.
+// To manually trigger pre-filling after creation, use the Prefill method.
 func NewOrdersCache(cfg config.Cache, decoratee orders.Repository, logger *slog.Logger) (*OrdersCache, error) {
 	lru, err := lru.New[string, *orders.Order](cfg.Size)
 	if err != nil {
@@ -28,7 +35,13 @@ func NewOrdersCache(cfg config.Cache, decoratee orders.Repository, logger *slog.
 		decoratee: decoratee,
 		lru:       lru,
 		logger:    logger,
+		cfg:       cfg,
 	}, nil
+}
+
+// Prefill fills up the cache with the most fresh orders.
+func (c *OrdersCache) Prefill(ctx context.Context) error {
+	return c.load(ctx, c.cfg.Size)
 }
 
 func (c *OrdersCache) Create(ctx context.Context, o *orders.Order) (*orders.Order, error) {
@@ -60,4 +73,25 @@ func (c *OrdersCache) GetByID(ctx context.Context, id string) (*orders.Order, er
 
 	c.lru.Add(id, order)
 	return order, nil
+}
+
+func (c *OrdersCache) ListRecent(ctx context.Context, n int) ([]orders.Order, error) {
+	return c.decoratee.ListRecent(ctx, n)
+}
+
+func (c *OrdersCache) load(ctx context.Context, n int) error {
+	start := time.Now()
+
+	recents, err := c.decoratee.ListRecent(ctx, n)
+	if err != nil {
+		return fmt.Errorf("could not load recent orders: %w", err)
+	}
+
+	for _, order := range recents {
+		c.lru.Add(order.ID, &order)
+	}
+
+	duration := time.Since(start)
+	c.logger.Info("cache: loaded up", "time", duration.String(), "entries", len(recents))
+	return nil
 }

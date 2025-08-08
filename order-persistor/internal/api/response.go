@@ -7,19 +7,13 @@ import (
 
 var responseInternalError = newErrorResponse(500, "Internal server error")
 
-type field struct {
-	Name    string
-	Message string
-}
-
-type ErrorBody struct {
-	Message string  `json:"message,omitempty"`
-	Fields  []field `json:"fields,omitempty"`
-}
-
 type HTTPError struct {
 	Code int
-	Body ErrorBody
+	Body Error
+}
+
+type Error struct {
+	Message string `json:"message,omitempty"`
 }
 
 func (r *HTTPError) Write(w http.ResponseWriter) error {
@@ -27,21 +21,11 @@ func (r *HTTPError) Write(w http.ResponseWriter) error {
 	return respondJSON(r.Body, w)
 }
 
-func (r *HTTPError) WithField(name, message string) *HTTPError {
-	r.Body.Fields = append(r.Body.Fields, field{
-		Name:    name,
-		Message: message,
-	})
-
-	return r
-}
-
 func newErrorResponse(code int, message string) *HTTPError {
 	return &HTTPError{
 		Code: code,
-		Body: ErrorBody{
+		Body: Error{
 			Message: message,
-			Fields:  nil,
 		},
 	}
 }

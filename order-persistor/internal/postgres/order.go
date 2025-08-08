@@ -61,19 +61,7 @@ func (r *OrdersRepository) GetByID(ctx context.Context, id string) (*orders.Orde
 		}
 
 		order = *mapDtoToOrder(dto)
-
-		order.Items, err = r.ItemsDAO.GetByOrderID(ctx, id)
-		if err != nil {
-			return err
-		}
-
-		payment, err := r.PaymentsDAO.GetByOrderID(ctx, id)
-		if err != nil {
-			return err
-		}
-
-		order.Payment = payment
-		return nil
+		return r.assembleOrder(ctx, &order)
 	})
 
 	if err != nil {
@@ -81,6 +69,48 @@ func (r *OrdersRepository) GetByID(ctx context.Context, id string) (*orders.Orde
 	}
 
 	return &order, nil
+}
+
+func (r *OrdersRepository) ListRecent(ctx context.Context, n int) ([]orders.Order, error) {
+	var orders []orders.Order
+
+	err := withTx(ctx, r.Pool, func(ctx context.Context) error {
+		tx := ctx.Value(txKey{}).(pgx.Tx)
+		dtos, err := sqlc.New(tx).GetRecentOrders(ctx, int32(n))
+		if err != nil {
+			return err
+		}
+
+		for _, dto := range dtos {
+			order := *mapDtoToOrder(dto)
+			r.assembleOrder(ctx, &order)
+			orders = append(orders, order)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, describeError(err)
+	}
+
+	return orders, nil
+}
+
+func (r *OrdersRepository) assembleOrder(ctx context.Context, o *orders.Order) error {
+	var err error
+	o.Items, err = r.ItemsDAO.GetByOrderID(ctx, o.ID)
+	if err != nil {
+		return err
+	}
+
+	payment, err := r.PaymentsDAO.GetByOrderID(ctx, o.ID)
+	if err != nil {
+		return err
+	}
+
+	o.Payment = payment
+	return nil
 }
 
 func (r *OrdersRepository) insertOrder(ctx context.Context, o *orders.Order) (*orders.Order, error) {

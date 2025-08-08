@@ -49,3 +49,9 @@ RETURNING *;
 SELECT *
 FROM orders
 WHERE id = $1;
+
+-- name: GetRecentOrders :many
+SELECT *
+FROM orders
+ORDER BY date_created DESC
+LIMIT $1;

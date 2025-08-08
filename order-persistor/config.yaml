@@ -1,4 +1,7 @@
 cache:
+  prefill:
+    enabled: true
+    timeout: 3s
   size: 100
 log:
   level: debug

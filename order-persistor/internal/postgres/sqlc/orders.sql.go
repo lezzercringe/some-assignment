@@ -133,6 +133,52 @@ func (q *Queries) GetOrderByID(ctx context.Context, id string) (Order, error) {
 	return i, err
 }
 
+const getRecentOrders = `-- name: GetRecentOrders :many
+SELECT id, track_number, entry, locale, internal_signature, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard, delivery_name, delivery_city, delivery_phone, delivery_zip, delivery_address, delivery_region, delivery_email
+FROM orders
+ORDER BY date_created DESC
+LIMIT $1
+`
+
+func (q *Queries) GetRecentOrders(ctx context.Context, limit int32) ([]Order, error) {
+	rows, err := q.db.Query(ctx, getRecentOrders, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Order
+	for rows.Next() {
+		var i Order
+		if err := rows.Scan(
+			&i.ID,
+			&i.TrackNumber,
+			&i.Entry,
+			&i.Locale,
+			&i.InternalSignature,
+			&i.CustomerID,
+			&i.DeliveryService,
+			&i.Shardkey,
+			&i.SmID,
+			&i.DateCreated,
+			&i.OofShard,
+			&i.DeliveryName,
+			&i.DeliveryCity,
+			&i.DeliveryPhone,
+			&i.DeliveryZip,
+			&i.DeliveryAddress,
+			&i.DeliveryRegion,
+			&i.DeliveryEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateOrder = `-- name: UpdateOrder :one
 UPDATE orders
 SET
