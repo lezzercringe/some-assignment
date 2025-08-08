@@ -41,7 +41,15 @@ func NewOrdersCache(cfg config.Cache, decoratee orders.Repository, logger *slog.
 
 // Prefill fills up the cache with the most fresh orders.
 func (c *OrdersCache) Prefill(ctx context.Context) error {
-	return c.load(ctx, c.cfg.Size)
+	now := time.Now()
+	qtyLoaded, err := c.load(ctx, c.cfg.Size)
+	took := time.Since(now)
+	if err != nil {
+		return err
+	}
+
+	c.logger.Info("cache: prefilled", "orders_loaded", qtyLoaded, "took", took.String())
+	return nil
 }
 
 func (c *OrdersCache) Create(ctx context.Context, o *orders.Order) (*orders.Order, error) {
@@ -79,12 +87,12 @@ func (c *OrdersCache) ListRecent(ctx context.Context, n int) ([]orders.Order, er
 	return c.decoratee.ListRecent(ctx, n)
 }
 
-func (c *OrdersCache) load(ctx context.Context, n int) error {
+func (c *OrdersCache) load(ctx context.Context, n int) (loaded int, err error) {
 	start := time.Now()
 
 	recents, err := c.decoratee.ListRecent(ctx, n)
 	if err != nil {
-		return fmt.Errorf("could not load recent orders: %w", err)
+		return 0, fmt.Errorf("could not load recent orders: %w", err)
 	}
 
 	for _, order := range recents {
@@ -93,5 +101,5 @@ func (c *OrdersCache) load(ctx context.Context, n int) error {
 
 	duration := time.Since(start)
 	c.logger.Info("cache: loaded up", "time", duration.String(), "entries", len(recents))
-	return nil
+	return len(recents), nil
 }

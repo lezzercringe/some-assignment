@@ -97,7 +97,7 @@ func main() {
 		defer cancel()
 
 		if err := cachingOrdersRepository.Prefill(ctx); err != nil {
-			logger.Error("error initializing order cache", "err", err)
+			logger.Error("error pre-filling orders cache", "err", err)
 			os.Exit(1)
 		}
 	}
