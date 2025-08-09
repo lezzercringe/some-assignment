@@ -15,9 +15,16 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+type Client interface {
+	ReadMessage(timeout time.Duration) (*kafka.Message, error)
+	Subscribe(topic string, rebalanceCb kafka.RebalanceCb) error
+	Commit() ([]kafka.TopicPartition, error)
+	Close() error
+}
+
 type OrdersConsumer struct {
-	consumer *kafka.Consumer
-	cfg      config.KafkaConsumer
+	client Client
+	cfg    config.KafkaConsumer
 
 	ordersRepository orders.Repository
 	logger           *slog.Logger
@@ -40,7 +47,7 @@ func NewOrdersConsumer(cfg config.KafkaConsumer, ordersRepository orders.Reposit
 	}
 
 	return &OrdersConsumer{
-		consumer:         c,
+		client:           c,
 		cfg:              cfg,
 		ordersRepository: ordersRepository,
 		logger:           logger,
@@ -51,7 +58,7 @@ func NewOrdersConsumer(cfg config.KafkaConsumer, ordersRepository orders.Reposit
 func (c *OrdersConsumer) Run(ctx context.Context) error {
 	c.logger.Info("started kafka consumer", "cfg", c.cfg)
 
-	if err := c.consumer.Subscribe(c.cfg.Topic, nil); err != nil {
+	if err := c.client.Subscribe(c.cfg.Topic, nil); err != nil {
 		return fmt.Errorf("could not subscribe to a topic: %w", err)
 	}
 	defer c.closeConsumer()
@@ -70,7 +77,7 @@ func (c *OrdersConsumer) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			msg, err := c.consumer.ReadMessage(c.cfg.ReadTimeout)
+			msg, err := c.client.ReadMessage(c.cfg.ReadTimeout)
 			if err != nil {
 				if err.(kafka.Error).IsTimeout() {
 					continue
@@ -108,7 +115,7 @@ func (c *OrdersConsumer) Run(ctx context.Context) error {
 				return err
 			}
 
-			_, err = c.consumer.Commit()
+			_, err = c.client.Commit()
 			if err != nil {
 				return fmt.Errorf("could not commit message: %w", err)
 			}
@@ -120,6 +127,8 @@ func (c *OrdersConsumer) Run(ctx context.Context) error {
 
 var errMalformedOrder = errors.New("message was malformed")
 
+// handleMessage processes JSON-encoded order message
+// In case of bad json/order returns errMalformedOrder
 func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 	var order orders.Order
 	if err := json.Unmarshal(body, &order); err != nil {
@@ -129,7 +138,7 @@ func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 			"message", string(body),
 		)
 
-		return errMalformedOrder
+		return errors.Join(errMalformedOrder, err)
 	}
 
 	if err := validator.New().StructCtx(ctx, order); err != nil {
@@ -143,7 +152,7 @@ func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 			"message", string(body),
 		)
 
-		return errMalformedOrder
+		return errors.Join(errMalformedOrder, err)
 	}
 
 	if _, err := c.ordersRepository.Create(ctx, &order); err != nil {
@@ -161,7 +170,7 @@ func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 			return ctx.Err()
 		}
 
-		return errMalformedOrder
+		return errors.Join(errMalformedOrder, err)
 	}
 
 	return nil
@@ -170,6 +179,6 @@ func (c *OrdersConsumer) handleMessage(ctx context.Context, body []byte) error {
 // closeConsumer wraps closing inner consumer into sync.Once
 func (c *OrdersConsumer) closeConsumer() {
 	c.shutdownOnce.Do(func() {
-		c.consumer.Close()
+		c.client.Close()
 	})
 }

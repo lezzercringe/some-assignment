@@ -92,8 +92,8 @@ func main() {
 		cancel()
 	})
 
-	if cfg.Cache.Prefill.Enabled {
-		ctx, cancel := context.WithTimeout(ctx, cfg.Cache.Prefill.Timeout)
+	if cfg.Prefill.Enabled {
+		ctx, cancel := context.WithTimeout(ctx, cfg.Prefill.Timeout)
 		defer cancel()
 
 		if err := cachingOrdersRepository.Prefill(ctx); err != nil {
@@ -116,8 +116,6 @@ func main() {
 
 	<-ctx.Done()
 	logger.Info("shutting down...")
-
-	ordersConsumer.Stop()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
