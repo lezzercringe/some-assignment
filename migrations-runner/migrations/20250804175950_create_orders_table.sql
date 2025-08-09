@@ -51,13 +51,13 @@ CREATE TABLE IF NOT EXISTS payments (
     custom_fee    DECIMAL NOT NULL
 );
 
--- TODO: create indexes
-
+CREATE INDEX IF NOT EXISTS idx_orders_date_created_desc ON orders (date_created DESC);
 
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
+DROP INDEX IF EXISTS idx_orders_date_created_desc;
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS items;
 DROP TABLE IF EXISTS orders;
