@@ -87,8 +87,6 @@ func (c *OrdersCache) ListRecent(ctx context.Context, n int) ([]orders.Order, er
 }
 
 func (c *OrdersCache) load(ctx context.Context, n int) (loaded int, err error) {
-	start := time.Now()
-
 	recents, err := c.decoratee.ListRecent(ctx, n)
 	if err != nil {
 		return 0, fmt.Errorf("could not load recent orders: %w", err)
@@ -98,7 +96,5 @@ func (c *OrdersCache) load(ctx context.Context, n int) (loaded int, err error) {
 		c.lru.Add(order.ID, &order)
 	}
 
-	duration := time.Since(start)
-	c.logger.Info("cache: loaded up", "time", duration.String(), "entries", len(recents))
 	return len(recents), nil
 }
