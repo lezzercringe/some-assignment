@@ -8,12 +8,17 @@ import (
 	"order-persistor/internal/orders"
 
 	gorilla "github.com/gorilla/handlers"
+	swagger "github.com/swaggo/http-swagger"
+	_ "order-persistor/docs"
 )
 
 type Params struct {
 	Logger           *slog.Logger
 	OrdersRepository orders.Repository
 }
+
+// @title           Order-persistor API
+// @version         1.0
 
 func NewServer(cfg config.API, p Params) *http.Server {
 	mux := http.NewServeMux()
@@ -29,6 +34,7 @@ func NewServer(cfg config.API, p Params) *http.Server {
 		gorilla.CORS(),
 		NewLogMiddleware(p.Logger),
 	))
+	mux.Handle("/swagger/", swagger.WrapHandler)
 
 	return &http.Server{
 		Addr:    httpAddr,

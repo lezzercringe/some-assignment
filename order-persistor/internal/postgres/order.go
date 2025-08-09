@@ -133,6 +133,7 @@ func (r *OrdersRepository) insertOrder(ctx context.Context, o *orders.Order) (*o
 		DeliveryAddress:   o.Delivery.Address,
 		DeliveryRegion:    o.Delivery.Region,
 		DeliveryEmail:     o.Delivery.Email,
+		DeliveryCity:      o.Delivery.City,
 	})
 
 	if err != nil {

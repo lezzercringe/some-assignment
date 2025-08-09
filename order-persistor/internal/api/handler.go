@@ -12,6 +12,18 @@ type GetOrderHandler struct {
 	Repository orders.Repository
 }
 
+// GetOrder godoc
+// @Summary Get order by ID
+// @Description Returns the order object for the specified ID
+// @Tags orders
+// @Accept json
+// @Produce json
+// @Param id path string true "Order ID"
+// @Success 200 {object} orders.Order
+// @Failure 400 {object} Error "Invalid request"
+// @Failure 404 {object} Error "Order not found"
+// @Failure 500 {object} Error "Internal server error"
+// @Router /order/{id} [get]
 func (h *GetOrderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log := h.Logger.With("url", r.URL)
 
