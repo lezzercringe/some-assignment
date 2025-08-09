@@ -1,2 +1,2 @@
-servers: localhost
+servers: broker:29092
 topic: orders
