@@ -69,9 +69,9 @@ async function lookupHandler() {
   showCard(renderOrderCard(result.value));
 }
 
-function setIsLoading(isLoading: boolean) {
-  isLoading = true;
-  button.disabled = isLoading;
+function setIsLoading(value: boolean) {
+  isLoading = value;
+  button.disabled = value;
   window.document.body.style["background"] = "red";
 }
 
