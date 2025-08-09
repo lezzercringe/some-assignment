@@ -17,7 +17,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         />
         <button
           id="fetchOrderBtn"
-          class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+          class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-blue-200 transition"
         >
           Fetch
         </button>
@@ -36,19 +36,30 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 const orderCard = document.querySelector('#orderCard')!;
 const validationErrorField = document.querySelector<HTMLInputElement>('#validationError')!;
 const idInput = document.querySelector<HTMLInputElement>('#orderIdInput')!;
-const button = document.querySelector('#fetchOrderBtn')!;
+const button = document.querySelector<HTMLButtonElement>('#fetchOrderBtn')!;
 
 button.addEventListener("click", lookupHandler);
+idInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    lookupHandler();
+  }
+});
+
+let isLoading = false;
 
 async function lookupHandler() {
+  if (isLoading) { return; }
+
   const orderId = idInput.value.trim();
   if (orderId.length === 0) {
     setValidationError("order id cannot be empty");
     return;
   }
 
+  setIsLoading(true)
   setValidationError(null);
   const result = await FetchOrder(orderId);
+  setIsLoading(false)
 
   if (!result.ok) {
     showCard(renderFetchError(result.error));
@@ -56,6 +67,12 @@ async function lookupHandler() {
   }
 
   showCard(renderOrderCard(result.value));
+}
+
+function setIsLoading(isLoading: boolean) {
+  isLoading = true;
+  button.disabled = isLoading;
+  window.document.body.style["background"] = "red";
 }
 
 function setValidationError(message: string | null) {
@@ -79,6 +96,7 @@ function renderFetchError(error: FetchError): string {
 
   return `Unexpected ${error.type} error happened`
 }
+
 
 function renderOrderCard(order: Order): string {
   const createdDate = new Date(order.date_created).toLocaleString();
