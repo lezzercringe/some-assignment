@@ -28,6 +28,8 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    labels:
+      - "traefik.enable=false"
 
   migrations_runner:
     build: ./migrations-runner/
@@ -37,6 +39,8 @@ services:
     environment:
       GOOSE_DRIVER: postgres
       GOOSE_DBSTRING: postgres://postgres:development@db:5432/postgres
+    labels:
+      - "traefik.enable=false"
 
   frontend:
     build: 
@@ -80,6 +84,8 @@ services:
 
   db:
     image: postgres
+    ports:
+      - 5432:5432
     environment:
       POSTGRES_PASSWORD: development
     healthcheck:
@@ -87,6 +93,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    labels:
+      - "traefik.enable=false"
 
   producer:
     build: ./producer
