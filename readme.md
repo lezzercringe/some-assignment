@@ -4,9 +4,9 @@
 ```bash
 docker-compose up
 ```
-- Пользовательский интерфейс доступен по адресу `http://frontend.localhost`
-- API сервиса доступен по адресу `http://api.localhost`
-- Swagger UI доступен по адресу `http://api.localhost/swagger`
+- Пользовательский интерфейс доступен по адресу <http://frontend.localhost>
+- API сервиса доступен по адресу <http://api.localhost>
+- Swagger UI доступен по адресу <http://api.localhost/swagger>
 
 # Сидирование
 Для наполнения топика тестовыми данными существует отдельное приложение `producer`. \
