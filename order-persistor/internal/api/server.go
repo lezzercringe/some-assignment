@@ -7,9 +7,10 @@ import (
 	"order-persistor/internal/config"
 	"order-persistor/internal/orders"
 
+	_ "order-persistor/docs"
+
 	gorilla "github.com/gorilla/handlers"
 	swagger "github.com/swaggo/http-swagger"
-	_ "order-persistor/docs"
 )
 
 type Params struct {
