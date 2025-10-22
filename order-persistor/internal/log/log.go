@@ -14,7 +14,7 @@ var levels = map[string]slog.Leveler{
 	"error": slog.LevelError,
 }
 
-func NewLogger(cfg config.Log) (*slog.Logger, error) {
+func New(cfg config.Log) (*slog.Logger, error) {
 	level, ok := levels[cfg.Level]
 	if !ok {
 		return nil, fmt.Errorf("unknown log level: %s", cfg.Level)

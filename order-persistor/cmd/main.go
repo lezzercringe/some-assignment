@@ -12,7 +12,6 @@ import (
 	"order-persistor/internal/postgres"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,7 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger, err := log.NewLogger(cfg.Log)
+	logger, err := log.New(cfg.Log)
 	if err != nil {
 		slog.Error("could not create logger", "err", err)
 		os.Exit(1)
@@ -84,13 +83,7 @@ func main() {
 		OrdersRepository: cachingOrdersRepository,
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	setupSignalHandler(func() {
-		logger.Info("received shutdown signal")
-		cancel()
-	})
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Kill)
 
 	if cfg.Prefill.Enabled {
 		ctx, cancel := context.WithTimeout(ctx, cfg.Prefill.Timeout)
@@ -120,14 +113,4 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	srv.Shutdown(shutdownCtx)
-}
-
-func setupSignalHandler(signalHandler func()) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
-
-	go func() {
-		<-c
-		signalHandler()
-	}()
 }
