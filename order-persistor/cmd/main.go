@@ -84,6 +84,7 @@ func main() {
 	})
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Kill)
+	defer cancel()
 
 	if cfg.Prefill.Enabled {
 		ctx, cancel := context.WithTimeout(ctx, cfg.Prefill.Timeout)
